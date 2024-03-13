@@ -26,11 +26,20 @@ const storeItemList = async () => {
     // in this function we will get the itemList from the recClasses file and store it in async storage
 
     //call initializeItemList
+
     let itemList2 = initializeItemList()
     let categoryMapList = initializeCategories()
+    uid = getUID()
+    const userRef = doc(database, 'users', uid);
+    // const userSnapshot = await getDoc(userRef);
+    // 
     try {
-        await AsyncStorage.setItem(uid + '|' + 'itemList', JSON.stringify(itemList2));
-        await AsyncStorage.setItem(uid + '|' + 'categoryMapList', JSON.stringify(categoryMapList))
+        await updateDoc(userRef, {
+            itemList: JSON.stringify(itemList2),
+            categoryMapList: JSON.stringify(categoryMapList)
+        })
+        // await AsyncStorage.setItem(uid + '|' + 'itemList', JSON.stringify(itemList2));
+        // await AsyncStorage.setItem(uid + '|' + 'categoryMapList', JSON.stringify(categoryMapList))
     } catch (e) {
         console.log("error storing item list")
     }
@@ -50,7 +59,12 @@ const createDocument = async (email, username, uid) => {
             favCategory: "",
             bedTime: 0,
             napDur: 0,
-            selectedItems: ""
+            selectedItems: "",
+            itemList: "",
+            categoryMapList: "",
+            loggedDate: "",
+            loggedSleep: "false"
+
         })
 
         const sleepDataCollectionRef = collection(userRef, "sleepData")
@@ -78,16 +92,53 @@ const createDocument = async (email, username, uid) => {
 const postSleepData = async (sleepQuality) => {
     const myUID = getUID()
     // only call storeItemList when async storage for 'itemList' and 'categoryMapList' is empty
-    if (await AsyncStorage.getItem(myUID + '|' + 'itemList') == null || await AsyncStorage.getItem(uid + '|' + 'categoryMapList') == null) {
+    const userRef = doc(database, 'users', myUID);
+    const userSnapShot = await getDoc(userRef)
+
+    let lastDate = ""
+    let itemList = ""
+    let categoryMapList = ""
+    try {
+        const userSnapShot = await getDoc(userRef)
+        if (userSnapShot.exists()) {
+            userInfo = userSnapShot.data()
+            lastDate = userInfo.lastDate
+            itemList = userInfo.itemList
+            categoryMapList = userInfo.categoryMapList
+        }
+        else {
+            console.log("failed to get user data")
+        }
+    }
+    catch (error) {
+        console.log('failed to last entry date ', error.message)
+        return null
+    }
+    // if (await getDoc(userRef, ))
+    // if (await AsyncStorage.getItem(myUID + '|' + 'itemList') == null || await AsyncStorage.getItem(uid + '|' + 'categoryMapList') == null) {
+    //     storeItemList()
+    // }
+    if (itemList == "" || categoryMapList == "") {
         storeItemList()
     }
-    updateActivityScores(sleepQuality)
+    updateActivityScores(sleepQuality, categoryMapList)
 
     try {
         const currentDate = new Date().toDateString()
-        await AsyncStorage.setItem(myUID + '|' + 'logged_sleep', 'true')
-        await AsyncStorage.setItem(myUID + '|' + "logged_date", currentDate)
+        try {
+            await updateDoc(userRef, {
+                loggedSleep: "true",
+                loggedDate: currentDate
+            })
+        }
+        catch (error) {
+            console.log("error updating data: ", error.message)
+        }
+        // await AsyncStorage.setItem(myUID + '|' + 'logged_sleep', 'true')
+        // await AsyncStorage.setItem(myUID + '|' + "logged_date", currentDate)
         console.log("posted sleep data!")
+
+        // don't uplaod this to firebase
         await AsyncStorage.setItem(myUID + '|' + 'sleepQuality', sleepQuality.toString())
 
         // store the sleep quality in async storage?
@@ -97,16 +148,15 @@ const postSleepData = async (sleepQuality) => {
     }
 
     // getting current user id
-    const auth = getAuth()
-    const user = auth.currentUser
-    uid = user.uid
+    // const auth = getAuth()
+    // const user = auth.currentUser
+    // uid = user.uid
 
     // getting user from database
-    const userRef = doc(database, 'users', uid)
-    lastDate = ""
+    // const userRef = doc(database, 'users', uid)
     // getting user's last entry
     try {
-        const userSnapShot = await getDoc(userRef)
+        // const userSnapShot = await getDoc(userRef)
         if (userSnapShot.exists()) {
             userInfo = userSnapShot.data()
             lastDate = userInfo.lastDate
@@ -158,8 +208,13 @@ const postSleepData = async (sleepQuality) => {
 
 }
 
-const updateActivityScores = async (sleepQuality) => {
+const updateActivityScores = async (sleepQuality, mapList) => {
     // get the activity from async storage
+
+    const uid = getUID()
+    const userRef = doc(database, 'users', uid);
+    const userSnapShot = await getDoc(userRef);
+
     let weatherData = await getWeatherInfo();
     console.log("weather data in update activityscores: ", weatherData);
     // get the temperature data from the json
@@ -172,7 +227,7 @@ const updateActivityScores = async (sleepQuality) => {
 
     let { sleepData } = HealthKit();
     console.log("Sleep data from healthkit: ", sleepData);
-    if(sleepData === undefined) {
+    if (sleepData === undefined) {
         console.log("Error: no sleep data, will not update scores")
         return
     }
@@ -183,7 +238,7 @@ const updateActivityScores = async (sleepQuality) => {
     hours = parseInt(hour) + (parseInt(minute) / 60);
     console.log("hours: ", hours); // DEBUG
 
-    
+
 
     // get the exercise duration from healthkit
 
@@ -191,43 +246,73 @@ const updateActivityScores = async (sleepQuality) => {
     // retrieve from fb
     // let selectedItems = await AsyncStorage.getItem(uid + '|' + 'selectedItems')
     let selectedItems = ""
-    if (userSnapshot.exists()) {
-        selectedItems = userSnapshot.data().selectedItems;
-        console.log("firebase selectedItems:", selectedItems);
-    } else {
-        console.log("User does not exist.");
+    console.log("about to retrieve selected items from firebase")
+    // const auth = getAuth()
+    // const user = auth.currentUser
+    // uid = user.uid
+    // const userRef = doc(database, 'users', uid);
+
+    // const userSnapShot = await getDoc(userRef)
+    try {
+        if (userSnapShot.exists()) {
+            userInfo = userSnapShot.data()
+            selectedItems = userInfo.selectedItems
+        } else {
+            console.log("failed to get selected Items")
+        }
+
+    } catch (error) {
+        console.log('failed to get selected itemss', error.message)
+        return null
     }
+    // selectedItems = await getFireBase('selectedItems');
+
 
     selectedItems = JSON.parse(selectedItems)
-    console.log("selectedItems: ", selectedItems)
+    console.log("selectedItems after json parse: ", selectedItems)
 
-    let activityList = await AsyncStorage.getItem(uid + '|' + 'itemList')
+
+    // let activityList = await AsyncStorage.getItem(uid + '|' + 'itemList')
+    let activityList = ""
+
+
+    try {
+        if (userSnapShot.exists()) {
+            userInfo = userSnapShot.data()
+            activityList = userInfo.itemList
+        }
+        else {
+            console.log("failed to get user data")
+        }
+    }
+    catch (error) {
+        console.log('failed to last entry date ', error.message)
+        return null
+    }
     activityList = JSON.parse(activityList)
     activityList = activityList.map(obj => new Activity(obj.name, obj.categoryNames, obj.indScore, obj.numPicks))
 
 
     // get the category map list from async storage
-    let categoryMapList = await AsyncStorage.getItem(uid + '|' + 'categoryMapList')
+    // let categoryMapList = await AsyncStorage.getItem(uid + '|' + 'categoryMapList')
+    let categoryMapList = mapList;
+    //retrieve category Map list from firebase
+
     categoryMapList = JSON.parse(categoryMapList)
     const map = new Map();
     for (const [key, value] of Object.entries(categoryMapList)) {
         map.set(key, value);
     }
     categoryMapList = map
-    console.log("categoryMapList: ", categoryMapList)
-
-    // get sleep goal from async (should be stored when first opening the app along with the sleep quality
-    // VEDAANT -- get live sleep data from last night -- 
-    // let {sleepData, activityData} = HealthKit()
-
+    console.log("categoryMapList after map conversion: ", categoryMapList)
 
     // get sleepGoal from firebase
-    const userRef = doc(database, 'users', uid);
-    const userSnapshot = await getDoc(userRef);
+
 
     let sleepGoal = -1
-    if (userSnapshot.exists()) {
-        sleepGoal = userSnapshot.data().sleepGoal;
+    // const userSnapShot = await getDoc(userRef);
+    if (userSnapShot.exists()) {
+        sleepGoal = userSnapShot.data().sleepGoal;
         console.log("firebase sleepGoal:", sleepGoal);
     } else {
         console.log("User does not exist.");
@@ -258,18 +343,27 @@ const updateActivityScores = async (sleepQuality) => {
 
     const exerciseGoal = await AsyncStorage.getItem(uid + '|' + 'activityGoal');
 
-    ({sleepData} = HealthKit());
+    ({ sleepData } = HealthKit());
 
     latestData = sleepData[0];
 
     const exerciseDuration = latestData.activityDuration;
     console.log("levi ex dur", exerciseDuration)
-    
+
     // sort activity score based on final score
     activityList.sort((a, b) => b.getScore(categoryMapList, degrees, currentTime, exerciseDuration, exerciseGoal) - a.getScore(categoryMapList, degrees, currentTime, exerciseDuration, exerciseGoal))
     try {
         console.log("Updated activityList: ", activityList)
-        await AsyncStorage.setItem(uid + '|' + 'itemList', JSON.stringify(activityList));
+        try {
+            await updateDoc(userRef, {
+                itemList: JSON.stringify(activityList)
+            })
+        }
+        catch (error) {
+            console.log("error updating data: ", error.message)
+        }
+
+        // await AsyncStorage.setItem(uid + '|' + 'itemList', JSON.stringify(activityList));
         // console.log("Updated activityList stored in AsyncStorage.");
     } catch (error) {
         console.error("Error storing updated activityList in AsyncStorage:", error.message);
@@ -331,7 +425,8 @@ const getUID = () => {
     const user = auth.currentUser
 
     uid = user.uid
-    
+
+
     return uid
 }
 
@@ -361,28 +456,33 @@ const signUp = async (email, password, confirmPassword, username, sleepGoal, act
             // updating last user entry date
             try {
                 await updateDoc(userRef, {
-                    sleepGoal: sleepGoal
+                    sleepGoal: sleepGoal,
+                    activityGoal: activityGoal,
+                    favCategory: favCategory,
+                    bedTime: bedTime,
+                    napDur: napDur
+
                 })
                 console.log("updated sleep goal (fb)!", sleepGoal)
 
-                await updateDoc(userRef, {
-                    activityGoal: activityGoal
-                })
+                // await updateDoc(userRef, {
+                //     activityGoal: activityGoal
+                // })
                 console.log("updated activityGoal goal (fb)!", activityGoal)
 
-                await updateDoc(userRef, {
-                    favCategory: favCategory
-                })
+                // await updateDoc(userRef, {
+                //     favCategory: favCategory
+                // })
                 console.log("updated favCategory goal (fb)!", favCategory)
 
-                await updateDoc(userRef, {
-                    bedTime: bedTime
-                })
+                // await updateDoc(userRef, {
+                //     bedTime: bedTime
+                // })
                 console.log("updated bedTime goal (fb)!", bedTime)
 
-                await updateDoc(userRef, {
-                    napDur: napDur
-                })
+                // await updateDoc(userRef, {
+                //     napDur: napDur
+                // })
                 console.log("updated napDur goal (fb)!", napDur)
 
             }
@@ -451,23 +551,39 @@ const getLocalTime = () => {
     return { hours: hours, minutes: minutes, seconds: seconds };
 };
 
+const setFirebase = async (item, value) => {
+    const uid = getUID()
+    const userRef = doc(database, 'users', uid)
+    try {
+        await updateDoc(userRef, {
+            item: value
+        })
+        console.log("updated napDur goal (fb)!", napDur)
+
+    }
+    catch (error) {
+        console.log("error updating data: ", error.message)
+    }
+}
+
 const getFirebase = async (item) => {
     const uid = getUID()
     const userRef = doc(database, 'users', uid)
     try {
-        const userSnapShot = await getDoc(userRef) 
-            if (userSnapShot.exists()) {
-                userInfo = userSnapShot.data()
-                // since item is a list of strings, we need to make a list here and return the list of items
-                // initialize a list
-                let listOfItems = []
-                for (let i = 0; i < item.length; i++) {
-                    listOfItems.push(userInfo[item[i]])
-                }
-                return listOfItems
-            } else {
-                console.log("failed to get user nap duration")
+        const userSnapShot = await getDoc(userRef)
+        if (userSnapShot.exists()) {
+            userInfo = userSnapShot.data()
+            // since item is a list of strings, we need to make a list here and return the list of items
+            // initialize a list
+
+            let listOfItems = []
+            for (let i = 0; i < item.length; i++) {
+                listOfItems.push(userInfo[item[i]])
             }
+            return listOfItems
+        } else {
+            console.log("failed to get user nap duration")
+        }
     } catch (error) {
         console.log('failed to get nap duration data', error.message)
         return null
@@ -478,5 +594,28 @@ function randomIntFromInterval(min, max) { // min and max included
     return Math.floor(Math.random() * (max - min + 1) + min)
 }
 
+const getFireBase = async (item) => {
+    const uid = getUID();
+    const userRef = doc(database, 'users', uid)
+    try {
+        const userSnapShot = await getDoc(userRef)
+        if (userSnapShot.exists()) {
+            userInfo = userSnapShot.data()
+            // since item is a list of strings, we need to make a list here and return the list of items
+            // initialize a list
+
+            let listOfItems = []
+            for (let i = 0; i < item.length; i++) {
+                listOfItems.push(userInfo[item[i]])
+            }
+            return listOfItems
+        } else {
+            console.log("failed to get user nap duration")
+        }
+    } catch (error) {
+        console.log('failed to get nap duration data', error.message)
+        return null
+    }
+}
 
 export { signIn, signUp, authUserSignUp, postSleepData, getWeatherInfo, getLocalTime, randomIntFromInterval, getUID, getFirebase }
