@@ -176,10 +176,10 @@ const postSleepData = async (sleepQuality) => {
     // console.log(currentDate, lastDate)
     // checking if current date equals last entry
     // only post if last date different
-    if (currentDate === lastDate) {
-        showToast('Already submitted post for today!')
-        return null
-    }
+    // if (currentDate === lastDate) {
+    //     showToast('Already submitted post for today!')
+    //     return null
+    // }
 
     // posting sleep quality
     const sleepDataCollection = collection(userRef, "sleepData")

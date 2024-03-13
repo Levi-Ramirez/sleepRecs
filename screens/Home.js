@@ -235,12 +235,6 @@ export default function Home({ route, navigation }) {
                     <TouchableOpacity onPress={logout}>
                         <Text>Logout</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={getWeatherInfo}>
-                        <Text>Test Weather</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={getLocalTime}>
-                        <Text>Test Time</Text>
-                    </TouchableOpacity>
                 </View>
             </View>
 
