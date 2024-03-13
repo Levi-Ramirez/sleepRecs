@@ -15,6 +15,8 @@ import Tabs from './components/Tab';
 import { setUser } from './redux/slices/user';
 
 import { getAuth, onAuthStateChanged, initializeAuth } from 'firebase/auth'
+import { collection, getDoc, updateDoc } from 'firebase/firestore';
+import { database, doc, setDoc, addDoc } from './firebaseConfig';
 
 import ActivityScreen from './screens/ActivityScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -63,8 +65,10 @@ export default function Index() {
             const currentDate = new Date().toDateString()
             // const postedDate = await AsyncStorage.getItem(uid + '|' + 'logged_date');
 
-            const logged_sleep = ""
-            const postedDate = ""
+            let logged_sleep = ""
+            let postedDate = ""
+
+
             try {
                 const userSnapShot = await getDoc(userRef)
                 if (userSnapShot.exists()) {
@@ -80,9 +84,13 @@ export default function Index() {
                 console.log('failed to last entry date ', error.message)
                 return null
             }
+
+            console.log("logggedSleep in index", logged_sleep)
             // checks if logged sleep exists
             if (logged_sleep) {
-                // if user logged sleep we will check if the user entered sleep for the current date
+
+                console.log("logggedSleep in index", logged_sleep)
+                // if user logged sleep we will check if the usexr entered sleep for the current date
                 if (logged_sleep === 'true') {
 
                     // if the current date and posted date are the same then the user already posted sleep for the current date
@@ -139,7 +147,7 @@ export default function Index() {
             checkLoggedSleep();
         }
         
-    }, []);
+    }, [user]);
 
     onAuthStateChanged(auth, (u) => {
         let email = null
